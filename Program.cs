@@ -42,12 +42,15 @@ builder.Services.AddScoped<IGitService, GitServiceExecutor>();
 builder.Services.Configure<KestrelServerOptions>(options =>
 {
     options.AllowSynchronousIO = true;
+    options.Limits.MinRequestBodyDataRate =
+            new MinDataRate(bytesPerSecond: 100, gracePeriod: TimeSpan.FromSeconds(10));
 });
 // If using IIS:
 builder.Services.Configure<IISServerOptions>(options =>
 {
     options.AllowSynchronousIO = true;
 });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -57,6 +60,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.Use((context, next) =>
+{
+    context.Request.EnableBuffering();
+    return next();
+});
 //app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

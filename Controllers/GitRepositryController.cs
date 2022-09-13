@@ -14,22 +14,21 @@ namespace SkyGit.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class RepositryController : ControllerBase
+    public class GitRepositryController : ControllerBase
     {
         private readonly IGitService gitService;
 
-        public RepositryController(IGitService gitService)
+        public GitRepositryController(IGitService gitService)
         {
             this.gitService = gitService;
         }
         [HttpGet]
-        public IActionResult Create(string name)
+        public IActionResult CreateRepo(string name)
         {
             string path = LibGit2Sharp.Repository.Init($"wwwroot\\Repositories\\{name}", true);
             return Ok(path);
         }
         [HttpGet]
-
         public IActionResult GetRepoUrl(string name)
         {
             string serverAddress = string.Format("{0}://{1}/{2}{3}",
@@ -42,22 +41,76 @@ namespace SkyGit.Controllers
             return Ok(serverAddress);
         }
         [HttpGet("/{repositoryName}.git/info/refs")]
-        public async Task<IActionResult> Clone(string repositoryName,string service)
+        //عند عمل كلون او بوش او جيت يتوجه لهذه الدالة
+        public async Task<IActionResult> SecureGetInfoRefs(string repositoryName,string service)
         {
             try
             {
-                return await GetRepo(repositoryName, service);
+                return await ActionsOnRepo(repositoryName, service);
             }
             catch (Exception ex)
             {
                 return NotFound();
             }
         }
-        private async  Task<ActionResult> GetRepo(string repositoryName, string service)
+        //pull or clone
+        [HttpPost("{repositoryName}.git/git-upload-pack")]
+        public async Task<ActionResult> SecureUploadPack(String repositoryName)
+        {
+            //if (!RepositoryIsValid(repositoryName))
+            //{
+            //    return new HttpNotFoundResult();
+            //}
+
+            //if (RepositoryPermissionService.HasPermission(User.Id(), repositoryName, RepositoryAccessLevel.Pull))
+            //{
+                return await ExecuteUploadPack(repositoryName);
+            //}
+            //else
+            //{
+            //    return UnauthorizedResult();
+            //}
+        }
+        //push Data
+        [HttpPost("{repositoryName}.git/git-receive-pack")]
+        public async Task<ActionResult> SecureReceivePack(String repositoryName)
+        {
+            //if (!RepositoryIsValid(repositoryName))
+            //{
+            //    return new HttpNotFoundResult();
+            //}
+
+            //if (RepositoryPermissionService.HasPermission(User.Id(), repositoryName, RepositoryAccessLevel.Push))
+            //{
+            return await ExecuteReceivePack(repositoryName);
+            //}
+            //else
+            //{
+            //    return UnauthorizedResult();
+            //}
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        private async  Task<ActionResult> ActionsOnRepo(string repositoryName, string service)
         {
             try { 
+                //معرفة نوع الاكشن بوش او بول
             bool isPush = string.Equals("git-receive-pack", service, StringComparison.OrdinalIgnoreCase);
-
+                //فالديشن على الريبو والصلاحيات بالداتا
             //if (!RepositoryIsValid(repositoryName))
             //{
             //    //////Database And Identity
@@ -83,11 +136,7 @@ namespace SkyGit.Controllers
             var requiredLevel = isPush ? RepositoryAccessLevel.Push : RepositoryAccessLevel.Pull;
                 //if (RepositoryPermissionService.HasPermission(User.Id(), repositoryName, requiredLevel))
                 //{
-                Response.Headers.TryAdd("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
-                Response.Headers.TryAdd("Pragma", "no-cache");
-                Response.Headers.TryAdd("Cache-Control", "no-cache, max-age=0, must-revalidate");
-                Response.HttpContext.Features.Get<IHttpResponseBodyFeature>().DisableBuffering();
-                Response.Headers.AcceptCharset = "";
+                
                 return await GetInfoRefs(repositoryName, service);
                 //}
                 //else
@@ -101,30 +150,58 @@ namespace SkyGit.Controllers
                 return NotFound();
             }
         }
+        private async Task<ActionResult> ExecuteUploadPack(string repositoryName)
+        {
+            var instream = await GetInputStream(disableBuffer: true);
 
-
-        //private static DirectoryInfo GetDirectoryInfo(String repositoryName)
-        //{
-        //    return new DirectoryInfo(Path.Combine(UserConfiguration.Current.Repositories, repositoryName));
-        //}
-
-        //private static bool RepositoryIsValid(string repositoryName)
-        //{
-        //    var directory = GetDirectoryInfo(repositoryName);
-        //    var isValid = Repository.IsValid(directory.FullName);
-           
-        //    return isValid;
-        //}
-
-        private async Task< ActionResult> GetInfoRefs(string repositoryName, string service)
+            return new GitCmdResult(
+                "application/x-git-upload-pack-result",
+                (outStream) =>
+                {
+                    gitService.ExecuteGitUploadPack(
+                        Guid.NewGuid().ToString("N"),
+                        repositoryName,
+                        instream,
+                        outStream);
+                });
+        }
+        private async Task<ActionResult> ExecuteReceivePack(string repositoryName)
+        {
+            var instream =await GetInputStream(disableBuffer: true);
+            return new GitCmdResult(
+                "application/x-git-receive-pack-result",
+                (outStream) =>
+                {
+                    gitService.ExecuteGitReceivePack(
+                        Guid.NewGuid().ToString("N"),
+                        repositoryName,
+                        instream,
+                        outStream);
+                });
+        }
+        //كلون او بول
+        private async Task<ActionResult> GetInfoRefs(string repositoryName, string service)
         {
             try { 
-            string contentType = string.Format("application/x-{0}-advertisement", service);
+                string contentType = string.Format("application/x-{0}-advertisement", service);
+                Response.Headers.TryAdd("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
+                Response.Headers.TryAdd("Pragma", "no-cache");
+                Response.Headers.TryAdd("Cache-Control", "no-cache, max-age=0, must-revalidate");
+                Response.HttpContext.Features.Get<IHttpResponseBodyFeature>().DisableBuffering();
+                Response.Headers.AcceptCharset = "";
                 Response.ContentType = contentType;
-
                 string serviceName = service.Substring(4);
-            string advertiseRefsContent = FormatMessage(string.Format("# service={0}\n", service)) + FlushMessage();
-                var _instream = GetInputStream();
+                string advertiseRefsContent = FormatMessage(string.Format("# service={0}\n", service)) + FlushMessage();
+
+                Stream _instream;
+                if(Request.Headers["Content-Encoding"] == "gzip")
+                { _instream = new GZipStream(HttpContext.Request.Body, CompressionMode.Decompress);
+                }else
+                {
+                    _instream = HttpContext.Request.Body;
+                }
+            
+
                 var GitCmdResult= new GitCmdResult(
                 contentType,
                  (outStream) =>
@@ -156,7 +233,7 @@ namespace SkyGit.Controllers
         {
             return "0000";
         }
-        private Stream GetInputStream(bool disableBuffer = false)
+        private async Task<Stream> GetInputStream(bool disableBuffer = false)
         {
             try
             {
