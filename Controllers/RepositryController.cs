@@ -27,7 +27,7 @@ namespace SkyGit.Controllers
             return Ok(serverAddress);
         }
         [HttpGet("/{repositoryName}.git/info/refs")]
-        public IActionResult CloneTo(string? repositoryName)
+        public IActionResult CloneTo(string repositoryName)
         {
             return Ok();
         }
