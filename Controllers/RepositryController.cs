@@ -1,11 +1,14 @@
 ﻿using LibGit2Sharp;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using SkyGit.Models.ApiResult;
 using SkyGit.Models.Enums;
 using SkyGit.Models.Git;
 using SkyGit.Models.Services.Git;
 using System.IO.Compression;
+using System.Net.Http;
+using System.Net.Mime;
 
 namespace SkyGit.Controllers
 {
@@ -78,8 +81,13 @@ namespace SkyGit.Controllers
             //}
 
             var requiredLevel = isPush ? RepositoryAccessLevel.Push : RepositoryAccessLevel.Pull;
-            //if (RepositoryPermissionService.HasPermission(User.Id(), repositoryName, requiredLevel))
-            //{
+                //if (RepositoryPermissionService.HasPermission(User.Id(), repositoryName, requiredLevel))
+                //{
+                Response.Headers.TryAdd("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
+                Response.Headers.TryAdd("Pragma", "no-cache");
+                Response.Headers.TryAdd("Cache-Control", "no-cache, max-age=0, must-revalidate");
+                Response.HttpContext.Features.Get<IHttpResponseBodyFeature>().DisableBuffering();
+                Response.Headers.AcceptCharset = "";
                 return await GetInfoRefs(repositoryName, service);
                 //}
                 //else
@@ -112,7 +120,9 @@ namespace SkyGit.Controllers
         {
             try { 
             string contentType = string.Format("application/x-{0}-advertisement", service);
-            string serviceName = service.Substring(4);
+                Response.ContentType = contentType;
+
+                string serviceName = service.Substring(4);
             string advertiseRefsContent = FormatMessage(string.Format("# service={0}\n", service)) + FlushMessage();
                 var _instream = GetInputStream();
                 var GitCmdResult= new GitCmdResult(

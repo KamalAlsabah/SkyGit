@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection.PortableExecutable;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace SkyGit.Models.ApiResult
 {
@@ -38,16 +39,11 @@ namespace SkyGit.Models.ApiResult
                 {
                     await response.WriteAsync(advertiseRefsContent);
                 }
+               
+               
+                
 
-                // SetNoCache
-
-                response.Headers.TryAdd("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
-                response.Headers.TryAdd("Pragma", "no-cache");
-                response.Headers.TryAdd("Cache-Control", "no-cache, max-age=0, must-revalidate");
-
-                response.HttpContext.Features.Get<IHttpResponseBodyFeature>().DisableBuffering();
-                response.Headers.AcceptCharset = "";
-                response.ContentType = contentType;
+                
                 executeGitCommand(response.Body);
             }catch(Exception ex)
             {

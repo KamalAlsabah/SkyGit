@@ -16,16 +16,28 @@ namespace SkyGit.Models.Services.Git
     public class GitServiceExecutor : IGitService
     {
         private static readonly string[] _permittedServiceNames = { "upload-pack", "receive-pack" };
+        private readonly IOptions<GitServiceExecutorParams> gitParms;
+        private readonly IWebHostEnvironment appEnvironment;
         private GitServiceExecutorParams _gitParms;
        
       
-        public GitServiceExecutor(IOptions<GitServiceExecutorParams> gitParms)
+        public GitServiceExecutor(IOptions<GitServiceExecutorParams> gitParms, IWebHostEnvironment appEnvironment)
         {
             _gitParms=gitParms.Value;
+            this.gitParms = gitParms;
+            this.appEnvironment = appEnvironment;
         }
-        public DirectoryInfo GetRepositoryDirectoryPath(string repository)
+        public string GetRepositoryDirectoryPath(string repositoryName)
         {
-            return new DirectoryInfo(Path.Combine(_gitParms.RepositoriesDirPath, repository));
+
+            var directoryInfo = Path.Combine(appEnvironment.WebRootPath, _gitParms.RepositoriesDirPath, repositoryName);
+            return directoryInfo;
+        }
+        public string GetGitExePath(string GitPath)
+        {
+
+            var directoryInfo = Path.Combine(appEnvironment.WebRootPath, GitPath);
+            return directoryInfo;
         }
         public  void ExecuteServiceByName(
            string correlationId,
@@ -37,9 +49,9 @@ namespace SkyGit.Models.Services.Git
         {
             var args = serviceName + " --stateless-rpc";
             args += options.ToCommandLineArgs();
-            args += " \"" + GetRepositoryDirectoryPath(repositoryName).FullName + "\"";
+            args += " \"" + GetRepositoryDirectoryPath(repositoryName) + "\"";
 
-            var info = new ProcessStartInfo(_gitParms.GitPath, args)
+            var info = new ProcessStartInfo(GetGitExePath(_gitParms.GitPath), args)
             {
                 CreateNoWindow = true,
                 RedirectStandardError = true,
