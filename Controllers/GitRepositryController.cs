@@ -12,7 +12,7 @@ using System.Net.Mime;
 
 namespace SkyGit.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("api/[controller]")]
     [ApiController]
     public class GitRepositryController : ControllerBase
     {
@@ -22,13 +22,13 @@ namespace SkyGit.Controllers
         {
             this.gitService = gitService;
         }
-        [HttpGet]
+        [HttpGet("CreateRepo/{name}")]
         public IActionResult CreateRepo(string name)
         {
             string path = LibGit2Sharp.Repository.Init($"wwwroot\\Repositories\\{name}", true);
             return Ok(path);
         }
-        [HttpGet]
+        [HttpGet("GetRepoUrl/{name}")]
         public IActionResult GetRepoUrl(string name)
         {
             string serverAddress = string.Format("{0}://{1}/{2}{3}",
@@ -54,7 +54,7 @@ namespace SkyGit.Controllers
             }
         }
         //pull or clone
-        [HttpPost("{repositoryName}.git/git-upload-pack")]
+        [HttpPost("/{repositoryName}.git/git-upload-pack")]
         public async Task<ActionResult> SecureUploadPack(String repositoryName)
         {
             //if (!RepositoryIsValid(repositoryName))
@@ -72,7 +72,7 @@ namespace SkyGit.Controllers
             //}
         }
         //push Data
-        [HttpPost("{repositoryName}.git/git-receive-pack")]
+        [HttpPost("/{repositoryName}.git/git-receive-pack")]
         public async Task<ActionResult> SecureReceivePack(String repositoryName)
         {
             //if (!RepositoryIsValid(repositoryName))
